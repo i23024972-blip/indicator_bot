@@ -1,0 +1,25 @@
+# Secrets — NEVER commit these
+.env
+*.env
+!.env.example
+
+# Live paper-trading state & logs (personal, not code)
+paper_state.json
+paper_trades.csv
+
+# Cached market data
+.klines_cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
