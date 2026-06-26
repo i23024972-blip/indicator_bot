@@ -14,9 +14,11 @@ from ta.momentum import RSIIndicator, StochasticOscillator
 from ta.volume import OnBalanceVolumeIndicator
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from datetime import datetime, timezone, timedelta
 import time
 
 # ─── SETTINGS ────────────────────────────────────────
+WIB = timezone(timedelta(hours=7))
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]   # set in .env (see .env.example)
 CHAT_ID         = os.environ["CHAT_ID"]
 
@@ -250,7 +252,7 @@ async def send_heartbeat():
     if current_timeframe_label == "1 Hour":
         if current_time - last_heartbeat >= HEARTBEAT_INTERVAL:
             last_heartbeat = current_time
-            current_hour = time.strftime("%H:%M:%S")
+            current_hour = datetime.now(WIB).strftime("%H:%M:%S")
             await send_message(
                 f"💓 Heartbeat - Bot is Alive!\n"
                 f"━━━━━━━━━━━━━━━━━━\n"

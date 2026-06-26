@@ -11,7 +11,7 @@ import os, json, csv, asyncio, time, sys
 from dotenv import load_dotenv
 load_dotenv()  # read secrets from a local .env file (never committed)
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from binance.client import Client
 try:
     import winsound
@@ -45,6 +45,8 @@ HEARTBEAT_EVERY= 1800          # status ping every 30 minutes
 
 STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_state.json")
 TRADES_CSV  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trades.csv")
+
+WIB = timezone(timedelta(hours=7))
 
 client = Client()
 bot    = Bot(token=TELEGRAM_TOKEN)
@@ -252,7 +254,7 @@ async def heartbeat():
             opn = "Open trades:\n" + opn
         else:
             opn = "No open trades (waiting for a signal)"
-        await tg(f"💓 PAPER bot alive  ·  {datetime.now().strftime('%H:%M')}\n"
+        await tg(f"💓 PAPER bot alive  ·  {datetime.now(WIB).strftime('%H:%M')}\n"
                  f"────────────────\n{bal_line()}\n{wl_line()}\n{opn}")
 
 # ─── TELEGRAM COMMANDS ───────────────────────────────
