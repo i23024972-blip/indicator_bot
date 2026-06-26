@@ -314,4 +314,5 @@ async def run():
         await asyncio.Event().wait()
 
 if __name__ == "__main__":
+    print(f"Starting indicator-bot on Fly.io (region {os.environ.get('FLY_REGION', 'local')})")
     asyncio.run(run())
