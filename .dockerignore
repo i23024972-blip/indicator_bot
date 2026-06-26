@@ -1,2 +1,11 @@
-fly.toml
+.env
 .venv
+__pycache__
+.git
+.gitignore
+*.md
+fly.toml
+Procfile
+paper_state.json
+paper_trades.csv
+.klines_cache
