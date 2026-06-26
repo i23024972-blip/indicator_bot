@@ -7,7 +7,7 @@
 #              alive NOW before risking real money. Sends clean Telegram + PC alerts marked [PAPER].
 #
 # Run:  python bot_zigzag_paper.py     then press /start in Telegram.
-import os, json, csv, asyncio, time
+import os, json, csv, asyncio, time, sys
 from dotenv import load_dotenv
 load_dotenv()  # read secrets from a local .env file (never committed)
 import pandas as pd
@@ -314,5 +314,5 @@ async def run():
         await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    print(f"Starting indicator-bot on Fly.io (region {os.environ.get('FLY_REGION', 'local')})")
+    print("Bot starting...")
     asyncio.run(run())
