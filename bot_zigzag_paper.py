@@ -41,7 +41,7 @@ LONG_FEE, SHORT_FEE = 0.20, 0.10   # round-trip % (spot long / futures-1x short)
 PAPER_START    = 1000.0        # virtual account size $
 POS_FRAC       = 1.0/len(SYMBOLS)   # share of account per position (3 coins -> ~33% each)
 CHECK_EVERY    = 600           # seconds between scans (10 min; new 30m candle every 30 min)
-HEARTBEAT_EVERY= 14400         # status ping every 4 hours (less notification spam)
+HEARTBEAT_EVERY= 1800          # status ping every 30 minutes
 
 STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_state.json")
 TRADES_CSV  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trades.csv")
