@@ -23,10 +23,14 @@ except Exception:
     notification = None
 from telegram import Bot, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import base64, gspread
+from google.oauth2.service_account import Credentials
 
 # ─── SETTINGS ────────────────────────────────────────
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]   # set in .env (see .env.example)
 CHAT_ID        = os.environ["CHAT_ID"]
+GSHEET_ID      = os.environ.get("GSHEET_ID")
+GSHEET_KEY_B64 = os.environ.get("GSHEET_KEY_B64")
 
 SYMBOLS = [("BTCUSDT", False), ("DOGEUSDT", False), ("HYPEUSDT", True)]  # (symbol, is_futures_feed)
 BIAS_INTERVAL  = Client.KLINE_INTERVAL_4HOUR
@@ -50,6 +54,12 @@ WIB = timezone(timedelta(hours=7))
 
 client = Client()
 bot    = Bot(token=TELEGRAM_TOKEN)
+try:
+    creds = Credentials.from_service_account_info(
+        json.loads(base64.b64decode(GSHEET_KEY_B64)), scopes=["https://spreadsheets.google.com/feeds"])
+    sheet = gspread.authorize(creds).open_by_key(GSHEET_ID).sheet1
+except Exception:
+    sheet = None
 BULL = ("HH+HL", "HL"); BEAR = ("LL+LH", "LH")
 
 is_running = False
@@ -81,6 +91,9 @@ def log_trade(row):
         if new: w.writerow(["closed_at","symbol","side","entry","exit","reason",
                             "net_pct","balance_after"])
         w.writerow(row)
+    if sheet:
+        try: sheet.append_row(row)
+        except Exception: pass
 
 # ─── DATA + INDICATORS ───────────────────────────────
 def get_data(symbol, is_futures, interval, limit=KLINE_LIMIT):
@@ -239,9 +252,9 @@ async def scan_loop():
                     save_state()
                 await asyncio.sleep(1)
 
-            await heartbeat()
         except Exception as e:
             print(f"scan error: {e}")
+        await heartbeat()
         await asyncio.sleep(CHECK_EVERY)
 
 async def heartbeat():
@@ -300,7 +313,7 @@ async def cmd_reset(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def run():
     global is_running, last_heartbeat
     load_state()
-    print("ZigZag PAPER bot ready. Press /start in Telegram.")
+    print("ZigZag PAPER bot ready.")
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stop", cmd_stop))
@@ -308,12 +321,21 @@ async def run():
     app.add_handler(CommandHandler("reset", cmd_reset))
     async with app:
         await app.start(); await app.updater.start_polling()
-        # auto-resume scanning if it was active before a crash/restart (no manual /start needed)
-        if STATE.get("active"):
-            is_running = True; last_heartbeat = 0
-            asyncio.create_task(scan_loop())
-            await tg(f"🔄 PAPER bot reconnected & resumed.\n────────────────\n{bal_line()}\n{wl_line()}")
-        await asyncio.Event().wait()
+        is_running = True; last_heartbeat = 0
+        scan_task = asyncio.create_task(scan_loop())
+        await tg(f"🔄 PAPER bot started.\n────────────────\n{bal_line()}\n{wl_line()}")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            is_running = False
+            scan_task.cancel()
+            try:
+                await scan_task
+            except asyncio.CancelledError:
+                pass
+            await app.stop()
 
 if __name__ == "__main__":
     print("Bot starting...")
