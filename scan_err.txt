@@ -1,0 +1,18 @@
+IHSG 5,999 | -34% off highs | REGIME CRASH → size 10% (≈Rp 1,600,000/trade)
+
+TICKER     CLOSE   VOLx        STRUCT     STATE  SIGNAL
+----------------------------------------------------------------------
+BBCA       6,025   0.5x  LL+LH/neutral         -  
+BMRI       4,000   1.0x     HL/neutral         -  
+BREN       3,650   0.3x  neutral/HH+HL         -  
+CUAN         625   0.3x  LL+LH/LL+LH         -  
+PTRO       4,000   0.5x  neutral/HL            -  
+BRPT       1,580   0.5x  LL+LH/LL+LH         -  
+DEWA         326   0.9x  LL+LH/HH+HL         -  
+BUMI         148   0.8x  LL+LH/HH+HL         -  
+ANTM       2,740   0.7x  LL+LH/HH+HL         -  
+AMMN       3,430   0.4x  LL+LH/HH+HL         -  
+RAJA       3,930   1.1x  neutral/HH+HL         -  
+PANI       6,600   0.7x  LL+LH/LL+LH         -  
+
+No signals today. Holding 0 position(s). Regime: CRASH.

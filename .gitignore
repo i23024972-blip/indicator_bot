@@ -6,6 +6,11 @@
 # Live paper-trading state & logs (personal, not code)
 paper_state.json
 paper_trades.csv
+*_state.json
+*.log
+*_out.txt
+idx_trade_replay_daily.txt
+idx_universe.json
 
 # Cached market data
 .klines_cache/
