@@ -45,7 +45,7 @@ LONG_FEE, SHORT_FEE = 0.20, 0.10   # round-trip % (spot long / futures-1x short)
 PAPER_START    = 1000.0        # virtual account size $
 POS_FRAC       = 1.0/len(SYMBOLS)   # share of account per position (3 coins -> ~33% each)
 CHECK_EVERY    = 600           # seconds between scans (10 min; new 30m candle every 30 min)
-HEARTBEAT_EVERY= 1800          # status ping every 30 minutes
+HEARTBEAT_EVERY= 7200          # status ping every 2 hours
 
 STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_state.json")
 TRADES_CSV  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trades.csv")
@@ -168,10 +168,10 @@ def bal_line():
 
 # ─── CORE: scan one symbol ───────────────────────────
 def evaluate_symbol(symbol, is_futures):
-    """Return (side, price, atr, sl, tp, s_entry) for a FRESH aligned signal, else side=None."""
+    """Return (side, price, atr, sl, tp, s_entry, s_bias) for a FRESH aligned signal, else side=None."""
     bias = get_data(symbol, is_futures, BIAS_INTERVAL)
     entry = get_data(symbol, is_futures, ENTRY_INTERVAL)
-    if len(bias) < 60 or len(entry) < 60: return (None, None, None, None, None, None)
+    if len(bias) < 60 or len(entry) < 60: return (None, None, None, None, None, None, None)
     entry["atr"] = atr_series(entry)
     s_bias  = structure_at(compute_zigzag_pivots(bias, DEVIATION),  len(bias)-1)
     s_entry = structure_at(compute_zigzag_pivots(entry, DEVIATION), len(entry)-1)
@@ -179,19 +179,19 @@ def evaluate_symbol(symbol, is_futures):
 
     prev = STATE["prev_struct"].get(symbol)
     STATE["prev_struct"][symbol] = s_entry
-    if prev is None: return (None, price, None, None, None, s_entry)     # warmup baseline
-    if FRESH_ONLY and s_entry == prev: return (None, price, None, None, None, s_entry)
+    if prev is None: return (None, price, None, None, None, s_entry, s_bias)     # warmup baseline
+    if FRESH_ONLY and s_entry == prev: return (None, price, None, None, None, s_entry, s_bias)
 
     bull = (s_bias in BULL) and (s_entry in BULL)
     bear = (s_bias in BEAR) and (s_entry in BEAR)
-    if not (bull or bear): return (None, price, None, None, None, s_entry)
+    if not (bull or bear): return (None, price, None, None, None, s_entry, s_bias)
 
     atr = entry["atr"].iloc[-1]
-    if pd.isna(atr) or atr<=0: return (None, price, None, None, None, s_entry)
+    if pd.isna(atr) or atr<=0: return (None, price, None, None, None, s_entry, s_bias)
     side = "LONG" if bull else "SHORT"
     if side=="LONG": sl, tp = price-atr*ATR_SL, price+atr*ATR_TP
     else:            sl, tp = price+atr*ATR_SL, price-atr*ATR_TP
-    return side, price, atr, sl, tp, s_entry
+    return side, price, atr, sl, tp, s_entry, s_bias
 
 def check_position(pos):
     """Return (closed?, net_pct, exit_price, reason)."""
@@ -234,7 +234,9 @@ async def scan_loop():
             open_syms = {p["symbol"] for p in STATE["positions"]}
             for symbol, fut in SYMBOLS:
                 if not is_running: break
-                side, price, atr, sl, tp, s_entry = evaluate_symbol(symbol, fut)
+                side, price, atr, sl, tp, s_entry, s_bias = evaluate_symbol(symbol, fut)
+                STATE.setdefault("last_struct", {})
+                STATE["last_struct"][symbol] = f"4H:{s_bias or '?'}  30M:{s_entry or '?'}"
                 if side and symbol not in open_syms:
                     stake = POS_FRAC * STATE["balance"]
                     STATE["positions"].append({"symbol":symbol, "is_futures":fut, "side":side,
@@ -262,13 +264,18 @@ async def heartbeat():
     now = time.time()
     if now - last_heartbeat >= HEARTBEAT_EVERY:
         last_heartbeat = now
+        if STATE.get("last_struct"):
+            struct = "\n".join(f"  • {sym}  {st}" for sym, st in STATE["last_struct"].items())
+            struct = "\nStructures:\n" + struct
+        else:
+            struct = ""
         if STATE["positions"]:
             opn = "\n".join(f"  • {p['side']} {p['symbol']} @ {fp(p['entry'])}" for p in STATE["positions"])
             opn = "Open trades:\n" + opn
         else:
             opn = "No open trades (waiting for a signal)"
         await tg(f"💓 PAPER bot alive  ·  {datetime.now(WIB).strftime('%H:%M')}\n"
-                 f"────────────────\n{bal_line()}\n{wl_line()}\n{opn}")
+                 f"────────────────\n{bal_line()}\n{wl_line()}{struct}\n{opn}")
 
 # ─── TELEGRAM COMMANDS ───────────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
