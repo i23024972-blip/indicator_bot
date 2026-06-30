@@ -15,6 +15,7 @@ except Exception: pass
 
 START=1000.0; RISK=1.0; MAXPOS=6; SL_ATR=3.0; TRAIL_ATR=4.0
 MIN_VOL=50e6; TOPN=45; VOL_LO,VOL_HI=0.8,3.2; INTERVAL="4h"
+CAPITAL=float(os.getenv("CRYPTO_CAPITAL","0") or 0)   # your REAL $ — alerts show how much to put in (0 = hide)
 STATE=os.path.join(os.path.dirname(__file__),"crypto_paper_state.json")
 
 def mkclient():
@@ -109,7 +110,13 @@ def main():
             if cost>st["cash"] or units<=0: continue
             st["cash"]-=cost
             st["positions"][sym]={"dir":want,"entry":entry,"units":units,"stop":stop,"peak":entry}
-            events.append(f"✅ {'LONG' if want==1 else 'SHORT'} {sym.replace('USDT','')} @ {entry:,.4g} → STOP {stop:,.4g}  (set in IPOT-equiv)")
+            msg=f"✅ {'LONG' if want==1 else 'SHORT'} {sym.replace('USDT','')} @ {entry:,.4g} → STOP {stop:,.4g}"
+            if CAPITAL>0:
+                rrisk=RISK/100*CAPITAL; rnotional=rrisk/(SL_ATR*a)*entry
+                msg+=f"  ·  PUT IN ${rnotional:,.0f} (risk ${rrisk:,.0f})"
+            else:
+                msg+="  (set hard stop)"
+            events.append(msg)
 
     eq=st["cash"]+sum(p["units"]*p["entry"] for p in st["positions"].values())
     today=str(pd.Timestamp.now('UTC').date()); do_hb=st.get("hb_date")!=today
