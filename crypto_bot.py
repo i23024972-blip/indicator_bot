@@ -110,12 +110,17 @@ def main():
             if cost>st["cash"] or units<=0: continue
             st["cash"]-=cost
             st["positions"][sym]={"dir":want,"entry":entry,"units":units,"stop":stop,"peak":entry}
+            R=SL_ATR*a; tp1=entry+want*2*R; tp2=entry+want*4*R   # 1R=3·ATR; scale-out at +2R/+4R
             msg=f"✅ {'LONG' if want==1 else 'SHORT'} {sym.replace('USDT','')} @ {entry:,.4g} → STOP {stop:,.4g}"
             if CAPITAL>0:
                 rrisk=RISK/100*CAPITAL; rnotional=rrisk/(SL_ATR*a)*entry
                 msg+=f"  ·  PUT IN ${rnotional:,.0f} (risk ${rrisk:,.0f})"
             else:
                 msg+="  (set hard stop)"
+            if tp1>0 and tp2>0:
+                msg+=f"\n   TP1 {tp1:,.4g} (+2R → sell ⅓) · TP2 {tp2:,.4g} (+4R → sell ⅓) · runner rides trail"
+            else:
+                msg+=f"\n   TP n/a — stop {abs(stop/entry-1)*100:.0f}% wide (vol spike); ride 4·ATR trail only"
             events.append(msg)
 
     eq=st["cash"]+sum(p["units"]*p["entry"] for p in st["positions"].values())
