@@ -19,6 +19,7 @@ START=1000.0; RISK=1.0; MAXPOS=6; SL_ATR=3.0; TRAIL_ATR=4.0   # cap 6: best real
 MIN_VOL=50e6; TOPN=45; VOL_LO,VOL_HI=0.8,3.2; INTERVAL="4h"; LR_LEN=200   # LR_LEN: trend-slope filter window
 CAPITAL=float(os.getenv("CRYPTO_CAPITAL","0") or 0)   # your REAL $ — alerts show how much to put in (0 = hide)
 STATE=os.getenv("CRYPTO_STATE_PATH") or os.path.join(os.path.dirname(__file__),"crypto_paper_state.json")   # Fly: volume path
+SHEET_URL=os.getenv("CRYPTO_SHEET_URL")   # Google Apps Script web-app URL — logs each closed trade (optional)
 
 def mkclient():
     for _ in range(6):
@@ -38,6 +39,13 @@ def notify(text):
             if requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",data={"chat_id":chat,"text":text},timeout=30).ok: return
         except Exception: pass
         time.sleep(4)
+
+def log_sheet(row):
+    if not SHEET_URL: return                       # not configured → no-op
+    try:
+        import requests
+        requests.post(SHEET_URL, json=row, timeout=20)
+    except Exception: pass
 
 def load():
     try:
@@ -74,7 +82,7 @@ def regime():
     return "BULL" if cur>ma200 else "BEAR"
 
 def main():
-    st=load(); reg=regime(); events=[]
+    st=load(); reg=regime(); events=[]; closed_rows=[]
     # universe
     syms=[s["symbol"] for s in client.futures_exchange_info()["symbols"]
           if s["symbol"].endswith("USDT") and s.get("contractType")=="PERPETUAL" and s["status"]=="TRADING"]
@@ -98,6 +106,7 @@ def main():
             px=p["stop"]; pnl=dir*(px-p["entry"])/p["entry"]*100
             st["cash"]+=p["units"]*p["entry"]+p["units"]*(px-p["entry"])*dir
             st["closed"].append({"sym":sym,"dir":"L" if dir==1 else "S","pnl":round(pnl,1)})
+            closed_rows.append({"sym":sym.replace("USDT",""),"side":"L" if dir==1 else "S","entry":round(p["entry"],6),"exit":round(px,6),"pnl":round(pnl,2)})
             events.append(f"🚪 CLOSE {sym.replace('USDT','')} {'L' if dir==1 else 'S'} @ {px:,.4g} ({pnl:+.1f}%)")
             del st["positions"][sym]
 
@@ -143,6 +152,8 @@ def main():
             events.append(msg)
 
     eq=st["cash"]+sum(p["units"]*p["entry"] for p in st["positions"].values())
+    for row in closed_rows:                          # log finished trades to Google Sheet
+        log_sheet({**row,"time":str(pd.Timestamp.now('UTC'))[:16],"equity":round(eq,2),"regime":reg})
     today=str(pd.Timestamp.now('UTC').date()); do_hb=st.get("hb_date")!=today
     st["curve"].append([str(pd.Timestamp.now('UTC'))[:16],round(eq,2)])
     if do_hb: st["hb_date"]=today
