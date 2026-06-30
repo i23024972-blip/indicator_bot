@@ -1,0 +1,20 @@
+# Fly.io config for the IDX konglo scanner (worker, weekday daily).
+# NOTE: uses yfinance — Yahoo may rate-limit Fly's datacenter IP. Check `fly logs` after the
+# first weekday run to confirm it actually pulls .JK data; if blocked, run IDX on the laptop.
+app = "eric-idx-bot"             # change if taken; must be globally unique
+primary_region = "sin"           # Singapore — closest to you
+
+[build]
+  dockerfile = "Dockerfile.idx"
+
+[env]
+  IDX_STATE_PATH = "/data/idx_scan_state.json"
+
+[mounts]
+  source = "idx_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1

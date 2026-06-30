@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements-idx-fly.txt .
+RUN pip install --no-cache-dir -r requirements-idx-fly.txt
+COPY idx_*.py run_idx_loop.py ./
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "run_idx_loop.py"]

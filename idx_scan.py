@@ -46,7 +46,7 @@ STRATEGY  = "HYBRID"      # HYBRID = TREND in HEALTHY regime, COMBO in CAUTION/C
 BASE_SIZE = 0.25          # HEALTHY size; regime multiplier scales it down
 ACCOUNT   = 16_000_000    # Rp — for position-size suggestions (edit to your capital)
 GAP_SKIP  = 3.0           # skip a buy if tomorrow could gap > this % (advisory)
-STATE_FILE = os.path.join(os.path.dirname(__file__), "idx_scan_state.json")
+STATE_FILE = os.getenv("IDX_STATE_PATH") or os.path.join(os.path.dirname(__file__), "idx_scan_state.json")   # Fly: volume path
 
 def notify(text):
     tok, chat = os.getenv("IDX_TG_TOKEN"), os.getenv("IDX_TG_CHAT")
