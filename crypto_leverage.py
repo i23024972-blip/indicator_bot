@@ -12,8 +12,9 @@ from crypto_bot import client, klines, regime, MIN_VOL, TOPN, VOL_LO, VOL_HI, SL
 try: sys.stdout.reconfigure(encoding="utf-8")
 except Exception: pass
 
-MMR = 0.005        # ~maintenance-margin rate (Binance tiers vary; conservative)
+MMR = 0.005         # ~maintenance-margin rate (Binance tiers vary; conservative)
 STOP_BUFFER = 1.25  # require liquidation to sit >=25% beyond the stop
+MIN_NOTIONAL = 5.0  # Binance USDT-perp min order size (~$5) — orders below this get rejected
 
 
 def ask_float(prompt, default):
@@ -46,9 +47,11 @@ def ticket(name, dir, entry, stop, risk_usd, user_max):
     liq_move = 1.0 / lev - MMR
     liq = entry * (1 - dir * liq_move)
     capped = lev < user_max
-    print(f"  {'LONG' if dir == 1 else 'SHORT'} {name}")
+    toosmall = notional < MIN_NOTIONAL
+    print(f"  {'LONG' if dir == 1 else 'SHORT'} {name}" + ("   *** SKIP — below ~$5 min order ***" if toosmall else ""))
     print(f"     entry         {entry:,.6g}")
-    print(f"     position size ${notional:,.2f}   ({units:,.4g} {name})  <- order quantity")
+    print(f"     position size ${notional:,.2f}   ({units:,.4g} {name})  <- order quantity"
+          + (f"  [<${MIN_NOTIONAL:.0f} min: skip, or use ${MIN_NOTIONAL:.0f} = risk ~${MIN_NOTIONAL*stop_frac:,.2f}]" if toosmall else ""))
     print(f"     leverage      {lev:.0f}x" + (f"   (capped from {user_max:.0f}x — stop {stop_frac*100:.0f}% too wide to lever more)" if capped else ""))
     print(f"     margin used   ${margin:,.2f}   <- cash this trade locks up")
     print(f"     stop-loss     {stop:,.6g}   (lose ~${risk_usd:,.2f} = your 1%)")
