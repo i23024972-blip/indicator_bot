@@ -121,6 +121,10 @@ def main():
                 msg+=f"\n   TP1 {tp1:,.4g} (+2R → sell ⅓) · TP2 {tp2:,.4g} (+4R → sell ⅓) · runner rides trail"
             else:
                 msg+=f"\n   TP n/a — stop {abs(stop/entry-1)*100:.0f}% wide (vol spike); ride 4·ATR trail only"
+            sf=SL_ATR*a/entry   # stop fraction → put-in/trade at each capital tier (risk% sizing)
+            ladder=" · ".join(f"{lbl}→${(t*RISK/100/sf):,.0f}"+("⚠" if (t*RISK/100/sf)<5 else "")
+                              for t,lbl in [(200,"$200"),(500,"$500"),(1000,"$1k")])
+            msg+=f"\n   📊 put-in/trade by capital: {ladder}  (⚠ = below $5 min order)"
             events.append(msg)
 
     eq=st["cash"]+sum(p["units"]*p["entry"] for p in st["positions"].values())
