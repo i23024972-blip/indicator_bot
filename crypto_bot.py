@@ -13,7 +13,7 @@ try:
     from dotenv import load_dotenv; load_dotenv()
 except Exception: pass
 
-START=1000.0; RISK=1.0; MAXPOS=50; SL_ATR=3.0; TRAIL_ATR=4.0   # MAXPOS high = "uncapped"; cash is the real limit (no leverage)
+START=1000.0; RISK=1.0; MAXPOS=6; SL_ATR=3.0; TRAIL_ATR=4.0   # cap 6: best realistic profile (1.56x/45%DD vs uncapped's unreachable 2.6x); first-come (conviction tested = noise)
 MIN_VOL=50e6; TOPN=45; VOL_LO,VOL_HI=0.8,3.2; INTERVAL="4h"
 CAPITAL=float(os.getenv("CRYPTO_CAPITAL","0") or 0)   # your REAL $ — alerts show how much to put in (0 = hide)
 STATE=os.path.join(os.path.dirname(__file__),"crypto_paper_state.json")
