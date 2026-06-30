@@ -1,0 +1,16 @@
+.env
+.git
+.klines_cache
+__pycache__
+*.pkl
+*.log
+*_state.json
+idx_*
+*.bat
+*.md
+crypto_backtest*.py
+crypto_lr_*.py
+crypto_mlrsi_*.py
+crypto_full_backtest.py
+crypto_capped.py
+crypto_slot_compare.py

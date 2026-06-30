@@ -1,7 +1,9 @@
 # crypto_bot.py — LIVE paper-trade bot: regime-directional dynamic-universe crypto strategy.
 #   Regime (BTC): BULL → take LONG breakouts · BEAR → take SHORT breakdowns · CRASH → CASH.
 #   Universe   : scanned live (top liquid perps, moderate-vol only) — no fixed list.
-#   Signal     : break prev-day high (long) / low (short), price on trend side of 200-EMA.
+#   Signal     : break prev-day high (long) / low (short), price on trend side of 200-EMA
+#                AND the 200-bar linear-regression slope agrees (validated filter: cuts counter-
+#                trend junk → in cap-6/$200 sim turned −11% into +39% over 1.5y, DD 45%→20%).
 #   Exit       : ride a 4-ATR chandelier trail (let winners run). Risk 1%/trade, max 6 positions.
 # Run on a schedule (e.g. every 4h). State in crypto_paper_state.json. Telegram → your group.
 import os, sys, json, time
@@ -14,9 +16,9 @@ try:
 except Exception: pass
 
 START=1000.0; RISK=1.0; MAXPOS=6; SL_ATR=3.0; TRAIL_ATR=4.0   # cap 6: best realistic profile (1.56x/45%DD vs uncapped's unreachable 2.6x); first-come (conviction tested = noise)
-MIN_VOL=50e6; TOPN=45; VOL_LO,VOL_HI=0.8,3.2; INTERVAL="4h"
+MIN_VOL=50e6; TOPN=45; VOL_LO,VOL_HI=0.8,3.2; INTERVAL="4h"; LR_LEN=200   # LR_LEN: trend-slope filter window
 CAPITAL=float(os.getenv("CRYPTO_CAPITAL","0") or 0)   # your REAL $ — alerts show how much to put in (0 = hide)
-STATE=os.path.join(os.path.dirname(__file__),"crypto_paper_state.json")
+STATE=os.getenv("CRYPTO_STATE_PATH") or os.path.join(os.path.dirname(__file__),"crypto_paper_state.json")   # Fly: volume path
 
 def mkclient():
     for _ in range(6):
@@ -44,6 +46,14 @@ def load():
 def save(s):
     with open(STATE,"w") as f: json.dump(s,f,indent=2,default=str)
 
+def lr_slope(src,n=LR_LEN):
+    # rolling endpoint slope of an n-bar linear regression (closed form; matches the validated backtest)
+    N=len(src); idx=np.arange(N,dtype=float); s=pd.Series(src)
+    Sx=n*(n-1)/2.0; Sxx=(n-1)*n*(2*n-1)/6.0; denom=n*Sxx-Sx*Sx
+    Sy=s.rolling(n).sum().values; Sjy=pd.Series(idx*src).rolling(n).sum().values
+    Sxy=Sjy-(idx-n+1)*Sy
+    return (n*Sxy-Sx*Sy)/denom
+
 def klines(sym,limit=300):
     kl=client.futures_klines(symbol=sym,interval=INTERVAL,limit=limit)
     df=pd.DataFrame(kl,columns=["t","open","high","low","close","v","ct","q","n","tb","tq","ig"])
@@ -51,6 +61,7 @@ def klines(sym,limit=300):
     df["time"]=pd.to_datetime(df["t"],unit="ms")
     pc=df["close"].shift(1); tr=pd.concat([(df["high"]-df["low"]),(df["high"]-pc).abs(),(df["low"]-pc).abs()],axis=1).max(axis=1)
     df["atr"]=tr.rolling(14).mean(); df["ema"]=df["close"].ewm(span=200,adjust=False).mean()
+    df["lrslope"]=lr_slope(df["close"].values,LR_LEN)   # trend-slope filter
     day=df["time"].dt.floor("D")
     df["pdh"]=day.map(df.groupby(day)["high"].max().shift(1)); df["pdl"]=day.map(df.groupby(day)["low"].min().shift(1))
     return df
@@ -100,8 +111,12 @@ def main():
             if not (VOL_LO<=volp<=VOL_HI): continue
             r=d.iloc[-1]; pr=d.iloc[-2]; a=float(r["atr"])
             if pd.isna(a) or a<=0 or pd.isna(r["pdh"]) or pd.isna(r["ema"]): continue
-            sig = (want==1 and r["close"]>r["pdh"] and pr["close"]<=r["pdh"] and r["close"]>r["ema"]) or \
-                  (want==-1 and r["close"]<r["pdl"] and pr["close"]>=r["pdl"] and r["close"]<r["ema"])
+            slp=r.get("lrslope"); slp=None if pd.isna(slp) else float(slp)   # LR-slope filter (None=not enough bars → don't block)
+            slope_long  = (slp is None) or slp>0
+            slope_short = (slp is None) or slp<0
+            # EMA200 trend gate + validated LR-slope agreement (to revert to EMA-only, drop the slope_long/slope_short clauses)
+            sig = (want==1 and r["close"]>r["pdh"] and pr["close"]<=r["pdh"] and r["close"]>r["ema"] and slope_long) or \
+                  (want==-1 and r["close"]<r["pdl"] and pr["close"]>=r["pdl"] and r["close"]<r["ema"] and slope_short)
             if not sig: continue
             entry=float(r["close"]); stop=entry-want*SL_ATR*a
             eq=st["cash"]+sum(pp["units"]*pp["entry"] for pp in st["positions"].values())

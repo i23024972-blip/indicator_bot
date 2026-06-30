@@ -1,0 +1,18 @@
+# Fly.io config for the crypto regime bot (worker, no inbound HTTP).
+app = "eric-crypto-bot"          # change if taken; must be globally unique
+primary_region = "sin"           # Singapore — closest to you + Binance
+
+[build]
+
+[env]
+  # state lives on the persistent volume so open positions survive redeploys
+  CRYPTO_STATE_PATH = "/data/crypto_paper_state.json"
+
+[mounts]
+  source = "crypto_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1
