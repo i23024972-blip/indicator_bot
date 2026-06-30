@@ -47,6 +47,7 @@ BASE_SIZE = 0.25          # HEALTHY size; regime multiplier scales it down
 ACCOUNT   = 16_000_000    # Rp — for position-size suggestions (edit to your capital)
 GAP_SKIP  = 3.0           # skip a buy if tomorrow could gap > this % (advisory)
 STATE_FILE = os.getenv("IDX_STATE_PATH") or os.path.join(os.path.dirname(__file__), "idx_scan_state.json")   # Fly: volume path
+SHEET_URL  = os.getenv("IDX_SHEET_URL")   # Google Apps Script web-app URL — logs closed trades to the "IDX" tab (optional)
 
 def notify(text):
     tok, chat = os.getenv("IDX_TG_TOKEN"), os.getenv("IDX_TG_CHAT")
@@ -69,6 +70,13 @@ def notify(text):
             print(f"  (telegram try {attempt} failed: {e})")
         time.sleep(5)
     print("  (telegram: gave up after 4 tries — signal is still in the log/console)")
+
+def log_sheet(row):
+    if not SHEET_URL: return                       # not configured → no-op
+    try:
+        import requests
+        requests.post(SHEET_URL, json=row, timeout=20)
+    except Exception: pass
 
 def load_state():
     try:
@@ -179,7 +187,7 @@ def main():
     date = pd.Timestamp.now().strftime("%d %b %Y")
 
     sigs = SIG.load()
-    buys, closed, cands = [], [], []
+    buys, closed, cands = [], [], []; closed_rows = []
     for t in WATCH:
         try:
             a = analyse(t)
@@ -216,6 +224,12 @@ def main():
                     closed.append(f"🛑 {t} hit STOP {fmt(s['stop'])}  (entry {fmt(s['entry'])}, {pct:+.0f}%)\n"
                                   f"   👉 Reply:  {t} <lots>   (or  {t} 0  if you skipped)")
 
+        # ── log a trade that just closed this run → Google Sheet "IDX" tab ──
+        if s and s.get("status") in ("hit_sl", "hit_tp") and s.get("exit_date") == a["date"]:
+            pct = (s["exit"]/s["entry"] - 1) * 100
+            closed_rows.append({"tab":"IDX","sym":t,"side":"L","entry":round(s["entry"],2),
+                                "exit":round(s["exit"],2),"pnl":round(pct,2),"equity":"","regime":reg})
+
         # ── fresh buy signal — HYBRID: TREND entry in HEALTHY regime, else COMBO ──
         mode = "trend" if (STRATEGY == "HYBRID" and reg == "HEALTHY") else "combo"
         fire = a["trend_buy"] if mode == "trend" else a["buy"]
@@ -249,6 +263,8 @@ def main():
 
     SIG.save(sigs)
     save_state(st)
+    for row in closed_rows:                          # log finished trades to Google Sheet
+        log_sheet({**row, "time": str(pd.Timestamp.now('UTC'))[:16]})
 
     # ── build the tidy message ──
     top = sorted(cands, key=lambda x: x["conviction"], reverse=True)[:5]
